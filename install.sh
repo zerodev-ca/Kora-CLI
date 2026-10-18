@@ -39,6 +39,25 @@ chmod +x "$temporary/$file"
 mv "$temporary/$file" "$directory/kora"
 echo "Installed kora to $directory/kora"
 case ":$PATH:" in
-    *":$directory:"*) ;;
-    *) echo "Add $directory to your PATH to run kora." ;;
+    *":$directory:"*) exit 0 ;;
 esac
+
+case "$(basename "${SHELL:-sh}")" in
+    zsh) profile="${ZDOTDIR:-$HOME}/.zshrc"; line="export PATH=\"$directory:\$PATH\"" ;;
+    bash) profile="$HOME/.bashrc"; line="export PATH=\"$directory:\$PATH\"" ;;
+    fish) profile="$HOME/.config/fish/config.fish"; line="fish_add_path \"$directory\"" ;;
+    *) profile="$HOME/.profile"; line="export PATH=\"$directory:\$PATH\"" ;;
+esac
+
+if [ "$(uname -s)" = "Darwin" ] && [ "$profile" = "$HOME/.bashrc" ]; then
+    profile="$HOME/.bash_profile"
+fi
+
+mkdir -p "$(dirname "$profile")"
+touch "$profile"
+if ! grep -qsF "$line" "$profile"; then
+    printf '\n%s\n' "$line" >> "$profile"
+    echo "Added $directory to your PATH in $profile"
+fi
+echo "Open a new terminal, or run this to use kora now:"
+echo "  $line"

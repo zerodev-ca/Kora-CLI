@@ -10,7 +10,7 @@ macOS and Linux:
 curl -fsSL https://raw.githubusercontent.com/zerodev-ca/Kora-CLI/main/install.sh | sh
 ```
 
-The script picks the build for your system, checks it against `checksums.txt` and installs it to `/usr/local/bin`, or `~/.local/bin` when that is not writable. Set `KORA_INSTALL_DIR` to choose another folder. Run it again to update.
+The script picks the build for your system, checks it against `checksums.txt` and installs it to `/usr/local/bin`, or `~/.local/bin` when that is not writable, and adds that folder to your shell's `PATH` when it is missing. Set `KORA_INSTALL_DIR` to choose another folder. Run it again to update.
 
 Windows: download `kora_windows_amd64.exe` (or `kora_windows_arm64.exe`) from the latest release, rename it to `kora.exe` and put it on your `PATH`.
 
