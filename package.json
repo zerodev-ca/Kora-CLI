@@ -1,0 +1,28 @@
+{
+    "name": "@zerodev-ca/kora-cli",
+    "version": "1.0.0",
+    "description": "Command line for Kora licensing: manage licenses from your terminal, script it, and hand it to an AI assistant",
+    "type": "module",
+    "bin": {
+        "kora": "./src/index.js"
+    },
+    "files": [
+        "src"
+    ],
+    "engines": {
+        "node": ">=20"
+    },
+    "scripts": {
+        "start": "node src/index.js",
+        "build": "bun scripts/build.js",
+        "typecheck": "tsc --noEmit -p ."
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/zerodev-ca/Kora-CLI.git"
+    },
+    "devDependencies": {
+        "@types/node": "^22.0.0",
+        "typescript": "^5.6.0"
+    }
+}
