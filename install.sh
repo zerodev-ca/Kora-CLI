@@ -1,34 +1,49 @@
 #!/bin/sh
 set -eu
 
+reset=""
+red=""
+green=""
+dim=""
+bold=""
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+    reset="$(printf '\033[0m')"
+    red="$(printf '\033[0;31m')"
+    green="$(printf '\033[0;32m')"
+    dim="$(printf '\033[0;2m')"
+    bold="$(printf '\033[1m')"
+fi
+
+fail() {
+    printf '%serror%s: %s\n' "$red" "$reset" "$1" >&2
+    exit 1
+}
+
 repository="https://github.com/zerodev-ca/Kora-CLI/releases/latest/download"
 directory="${KORA_INSTALL_DIR:-/usr/local/bin}"
 
 case "$(uname -s)" in
     Darwin) system="darwin" ;;
     Linux) system="linux" ;;
-    *) echo "Unsupported system $(uname -s). Download a build from $repository instead." >&2; exit 1 ;;
+    *) fail "$(uname -s) is not supported, download a build from $repository" ;;
 esac
 
 case "$(uname -m)" in
     x86_64 | amd64) architecture="amd64" ;;
     arm64 | aarch64) architecture="arm64" ;;
-    *) echo "Unsupported architecture $(uname -m)." >&2; exit 1 ;;
+    *) fail "$(uname -m) is not supported" ;;
 esac
 
 file="kora_${system}_${architecture}"
 temporary="$(mktemp -d)"
 trap 'rm -rf "$temporary"' EXIT
 
-curl -fsSL "$repository/$file" -o "$temporary/$file"
-curl -fsSL "$repository/checksums.txt" -o "$temporary/checksums.txt"
+curl --fail --location --progress-bar "$repository/$file" --output "$temporary/$file" || fail "could not download $file"
+curl -fsSL "$repository/checksums.txt" --output "$temporary/checksums.txt" || fail "could not download checksums.txt"
 
 expected="$(grep " $file\$" "$temporary/checksums.txt" | cut -d ' ' -f 1)"
 actual="$( (sha256sum "$temporary/$file" 2>/dev/null || shasum -a 256 "$temporary/$file") | cut -d ' ' -f 1)"
-if [ "$expected" != "$actual" ]; then
-    echo "Checksum mismatch for $file." >&2
-    exit 1
-fi
+[ "$expected" = "$actual" ] || fail "checksum mismatch for $file"
 
 if [ ! -w "$directory" ]; then
     directory="$HOME/.local/bin"
@@ -37,9 +52,13 @@ fi
 
 chmod +x "$temporary/$file"
 mv "$temporary/$file" "$directory/kora"
-echo "Installed kora to $directory/kora"
+
 case ":$PATH:" in
-    *":$directory:"*) exit 0 ;;
+    *":$directory:"*)
+        printf '\n%s✓%s %skora%s was installed successfully\n' "$green" "$reset" "$bold" "$reset"
+        printf '  %sRun %skora%s%s to get started%s\n\n' "$dim" "$reset$bold" "$reset" "$dim" "$reset"
+        exit 0
+        ;;
 esac
 
 case "$(basename "${SHELL:-sh}")" in
@@ -55,9 +74,7 @@ fi
 
 mkdir -p "$(dirname "$profile")"
 touch "$profile"
-if ! grep -qsF "$line" "$profile"; then
-    printf '\n%s\n' "$line" >> "$profile"
-    echo "Added $directory to your PATH in $profile"
-fi
-echo "Open a new terminal, or run this to use kora now:"
-echo "  $line"
+grep -qsF "$line" "$profile" || printf '\n%s\n' "$line" >> "$profile"
+
+printf '\n%s✓%s %skora%s was installed successfully\n' "$green" "$reset" "$bold" "$reset"
+printf '  %sRelaunch your terminal to run %skora%s\n\n' "$dim" "$reset$bold" "$reset"
