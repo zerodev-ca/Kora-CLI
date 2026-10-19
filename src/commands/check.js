@@ -14,16 +14,18 @@ export class CheckCommands {
     }
 
     help() {
-        return [
-            this.cli.out.bold("Test like your product does"),
-            "  kora validate --key KEY [--product P] [--fingerprint ID]     Exit 0 valid, 1 rejected, 2 unreachable",
-            "  kora activate --key KEY [--product P] [--fingerprint ID]     Take a seat for this machine, then validate",
-            "  kora deactivate --key KEY [--fingerprint ID]                 Free this machine's seat",
-            "  kora verify-offline --file FILE [--public-key FILE]          Check a signed license file with no network",
-            "  kora public-key                                              The key that signs answers and files",
-            "  kora fingerprint                                             This machine's id, sent as hwid",
-            this.cli.out.dim("  These use the signed-in server, or --url. --fingerprint defaults to this machine's id.")
-        ].join("\n");
+        return {
+            title: "Test like your product does",
+            rows: [
+                ["kora validate --key KEY [--product P] [--fingerprint ID]", "Exit 0 valid, 1 rejected, 2 unreachable"],
+                ["kora activate --key KEY [--product P] [--fingerprint ID]", "Take a seat for this machine, then validate"],
+                ["kora deactivate --key KEY [--fingerprint ID]", "Free this machine's seat"],
+                ["kora verify-offline --file FILE [--public-key FILE]", "Check a signed license file with no network"],
+                ["kora public-key", "The key that signs answers and files"],
+                ["kora fingerprint", "This machine's id, sent as hwid"]
+            ],
+            note: "These use the signed-in server, or --url. --fingerprint defaults to this machine's id."
+        };
     }
 
     async run(name, args, flags) {
@@ -80,7 +82,7 @@ export class CheckCommands {
         const reply = await this.client().send("POST", `/licenses/${name}`, this.body(flags), { auth: true });
         const result = reply.data;
         if (this.cli.out.json) this.cli.out.data(result);
-        if (!this.cli.out.json) this.cli.out.print(result.valid ? `${this.cli.out.green("✓ VALID")} ${result.message}` : `${this.cli.out.red(`✗ ${String(result.code).toUpperCase()}`)} ${result.message}`);
+        if (!this.cli.out.json) this.cli.out.print(`${this.cli.out.badge(result.valid ? "VALID" : String(result.code).toUpperCase(), result.valid)} ${result.message}`);
         if (!result.valid) process.exitCode = 1;
     }
 
@@ -88,7 +90,7 @@ export class CheckCommands {
         if (!flags.key) throw new KoraError("Pass --key.", 0);
         const result = (await this.client().send("POST", "/licenses/deactivate", this.body(flags))).data;
         if (this.cli.out.json) this.cli.out.data(result);
-        if (!this.cli.out.json) this.cli.out.print(result.success ? `${this.cli.out.green("✓")} ${result.message}` : `${this.cli.out.red("✗")} ${result.message}`);
+        if (!this.cli.out.json) this.cli.out.print(`${this.cli.out.badge(result.success ? "RELEASED" : String(result.code).toUpperCase(), result.success)} ${result.message}`);
         if (!result.success) process.exitCode = 1;
     }
 
@@ -113,10 +115,11 @@ export class CheckCommands {
         const license = authentic ? JSON.parse(text) : null;
         const problem = !authentic ? "signature does not match" : (Date.parse(license.refresh_after) < Date.now() ? "needs a refresh online" : (license.expires_at && Date.parse(license.expires_at) < Date.now() ? "expired" : ""));
         if (this.cli.out.json) this.cli.out.data({ valid: problem === "", problem: problem ? problem : null, license });
-        if (!this.cli.out.json && problem) this.cli.out.print(`${this.cli.out.red("✗ INVALID")} ${problem}`);
+        if (!this.cli.out.json && problem) this.cli.out.print(`${this.cli.out.badge("INVALID", false)} ${problem}`);
         if (!this.cli.out.json && !problem) {
-            this.cli.out.print(`${this.cli.out.green("✓ VALID")} signed by your Kora server`);
-            this.cli.out.pairs([["Key", license.key], ["Product", license.product.name], ["Customer", license.customer ? license.customer.name : null], ["Expires", license.expires_at ? this.cli.out.date(license.expires_at) : "never"], ["Refresh after", this.cli.out.date(license.refresh_after)]]);
+            this.cli.out.print(`${this.cli.out.badge("VALID", true)} Signed by your Kora server`);
+            this.cli.out.print();
+            this.cli.out.pairs([["Key", this.cli.out.bold(license.key)], ["Product", license.product.name], ["Customer", license.customer ? license.customer.name : null], ["Expires", license.expires_at ? this.cli.out.date(license.expires_at) : this.cli.out.dim("never")], ["Refresh after", this.cli.out.date(license.refresh_after)]]);
         }
         if (problem) process.exitCode = 1;
     }

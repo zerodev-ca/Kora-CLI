@@ -10,14 +10,16 @@ export class AccountCommands {
     }
 
     help() {
-        return [
-            this.cli.out.bold("Accounts"),
-            "  kora login [--url URL] [--token-stdin] [--name NAME]   Save an API token from the dashboard's API Tokens page",
-            "  kora logout [NAME] [--all]                              Forget a saved account",
-            "  kora whoami                                             The current account and what it can see",
-            "  kora accounts                                           Every saved account",
-            "  kora switch [NAME]                                      Pick the account commands use"
-        ].join("\n");
+        return {
+            title: "Accounts",
+            rows: [
+                ["kora login [--url URL] [--token-stdin] [--name NAME]", "Save an API token from the dashboard"],
+                ["kora logout [NAME] [--all]", "Forget a saved account"],
+                ["kora whoami", "The current account and what it can see"],
+                ["kora accounts", "Every saved account"],
+                ["kora switch [NAME]", "Pick the account commands use"]
+            ]
+        };
     }
 
     async run(name, args, flags) {
@@ -43,7 +45,7 @@ export class AccountCommands {
         const name = flags.name ? flags.name : new URL(client.url).host;
         this.cli.accounts.add(name, client.url, token);
         if (this.cli.out.json) return this.cli.out.data({ account: name, url: client.url, licenses: page.total });
-        this.cli.out.done(`Signed in to ${this.cli.out.bold(client.url)} as ${this.cli.out.bold(name)}. ${page.total} license(s) visible.`);
+        this.cli.out.done(`Signed in to ${this.cli.out.bold(client.url)} as ${this.cli.out.bold(name)} ${this.cli.out.dim(`(${page.total} licenses)`)}`);
     }
 
     logout(name, flags) {
@@ -54,7 +56,7 @@ export class AccountCommands {
         const account = this.cli.accounts.resolve(name ? name : flags.account);
         if (!account || account.name === "environment") throw new KoraError("No saved account to sign out of.", 0);
         this.cli.accounts.remove(account.name);
-        this.cli.out.done(`Forgot ${account.name}.`);
+        this.cli.out.done(`Forgot ${this.cli.out.bold(account.name)}.`);
     }
 
     async whoami() {
@@ -70,16 +72,16 @@ export class AccountCommands {
         const data = this.cli.accounts.load();
         const rows = Object.entries(data.accounts).map(([name, account]) => ({ name, url: account.url, current: name === data.current }));
         if (this.cli.out.json) return this.cli.out.data(rows);
-        this.cli.out.table(rows, [{ label: "", get: row => row.current ? this.cli.out.green("●") : " " }, { label: "Account", get: row => row.name }, { label: "Server", get: row => row.url }]);
+        this.cli.out.table(rows, [{ label: "", get: row => row.current ? this.cli.out.accent("●") : " " }, { label: "Account", get: row => row.current ? this.cli.out.bold(row.name) : row.name }, { label: "Server", get: row => row.url }]);
     }
 
     async switch(name) {
         const data = this.cli.accounts.load();
         const names = Object.keys(data.accounts);
         if (names.length === 0) throw new KoraError("No saved accounts. Run kora login.", 0);
-        const chosen = name ? name : names[Number(await this.cli.need(null, `${names.map((entry, index) => `  ${index + 1}. ${entry}${entry === data.current ? " (current)" : ""}`).join("\n")}\nAccount number: `)) - 1];
+        const chosen = name ? name : names[Number(await this.cli.need(null, `${names.map((entry, index) => `  ${this.cli.out.dim(String(index + 1).padStart(2))}  ${entry}${entry === data.current ? this.cli.out.dim(" (current)") : ""}`).join("\n")}\nAccount number: `)) - 1];
         if (!chosen) throw new KoraError("Pick one of the listed numbers.", 0);
         this.cli.accounts.use(chosen);
-        this.cli.out.done(`Using ${chosen}.`);
+        this.cli.out.done(`Using ${this.cli.out.bold(chosen)}.`);
     }
 }

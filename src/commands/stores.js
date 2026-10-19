@@ -10,11 +10,13 @@ export class StoreCommands {
     }
 
     help() {
-        return [
-            this.cli.out.bold("Stores"),
-            "  kora stores                                    Connected stores with their webhook and redeem URLs",
-            "  kora purchases [--status S] [-s TEXT]          Store purchases and the licenses they issued"
-        ].join("\n");
+        return {
+            title: "Stores",
+            rows: [
+                ["kora stores", "Connected stores with their webhook and redeem URLs"],
+                ["kora purchases [--status S] [-s TEXT]", "Store purchases and the licenses they issued"]
+            ]
+        };
     }
 
     async run(name, args, flags) {
@@ -26,13 +28,14 @@ export class StoreCommands {
         const rows = (await this.cli.client().call("GET", "/stores?limit=200")).stores;
         if (this.cli.out.json) return this.cli.out.data(rows);
         this.cli.out.table(rows, [
-            { label: "Id", get: row => row.id },
+            { label: "Id", get: row => this.cli.out.dim(row.id) },
             { label: "Name", get: row => this.cli.out.bold(row.name) },
             { label: "Store", get: row => row.provider_label },
-            { label: "Status", get: row => row.enabled ? this.cli.out.green("enabled") : this.cli.out.dim("disabled") },
-            { label: "Webhook URL", get: row => row.hook_url },
-            { label: "Redeem page", get: row => row.redeem_url }
+            { label: "Status", get: row => this.cli.out.tone(row.enabled ? "enabled" : "disabled") },
+            { label: "Webhook URL", get: row => this.cli.out.cyan(row.hook_url) },
+            { label: "Redeem page", get: row => row.redeem_url ? this.cli.out.cyan(row.redeem_url) : null }
         ]);
+        this.cli.out.count(rows.length, rows.length, "stores");
     }
 
     async purchases(flags) {
@@ -40,12 +43,13 @@ export class StoreCommands {
         const rows = (await client.call("GET", `/stores/purchases${client.query({ status: flags.status, search: flags.search, limit: flags.limit ? flags.limit : 50 })}`)).purchases;
         if (this.cli.out.json) return this.cli.out.data(rows);
         this.cli.out.table(rows, [
-            { label: "Order", get: row => row.order_id },
+            { label: "Order", get: row => this.cli.out.bold(row.order_id) },
             { label: "Store", get: row => row.connection_name },
             { label: "Buyer", get: row => row.buyer_name ? row.buyer_name : row.email },
             { label: "License", get: row => row.license_key ? this.cli.out.mask(row.license_key) : null },
             { label: "Status", get: row => this.cli.out.tone(row.status) },
-            { label: "Purchased", get: row => this.cli.out.date(row.created_at) }
+            { label: "Purchased", get: row => this.cli.out.ago(row.created_at) }
         ]);
+        this.cli.out.count(rows.length, rows.length, "purchases");
     }
 }

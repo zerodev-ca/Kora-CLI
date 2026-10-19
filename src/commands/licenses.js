@@ -12,17 +12,19 @@ export class LicenseCommands {
     }
 
     help() {
-        return [
-            this.cli.out.bold("Licenses"),
-            "  kora licenses [--status S] [--product P] [-s TEXT] [--reveal]   Newest first, keys masked",
-            "  kora licenses show LICENSE                                       Details, seats and recent checks",
-            "  kora licenses issue --product P (--customer C | --email E) [--name N] [--key K] [--expires DATE]",
-            "  kora licenses suspend | revoke | reinstate LICENSE               Change the status",
-            "  kora licenses status LICENSE STATUS                              Any configured status",
-            "  kora licenses download LICENSE [-o FILE]                         Signed offline file, - for stdout",
-            "  kora licenses delete LICENSE",
-            this.cli.out.dim("  LICENSE is a full key, the start of a key, a customer email with one license, or an id.")
-        ].join("\n");
+        return {
+            title: "Licenses",
+            rows: [
+                ["kora licenses [--status S] [--product P] [-s TEXT] [--reveal]", "Newest first, keys masked"],
+                ["kora licenses show LICENSE", "Details, seats and recent checks"],
+                ["kora licenses issue --product P (--customer C | --email E) [--name N] [--key K] [--expires DATE]", "Issue a license"],
+                ["kora licenses suspend | revoke | reinstate LICENSE", "Change the status"],
+                ["kora licenses status LICENSE STATUS", "Any configured status"],
+                ["kora licenses download LICENSE [-o FILE]", "Signed offline file, - for stdout"],
+                ["kora licenses delete LICENSE", "Delete for good"]
+            ],
+            note: "LICENSE is a full key, the start of a key, a customer email with one license, or an id."
+        };
     }
 
     async run(name, args, flags) {
@@ -57,15 +59,15 @@ export class LicenseCommands {
         const page = await client.call("GET", `/licenses${client.query({ status: flags.status, product_id: product ? product.id : undefined, search: flags.search, limit: flags.limit ? flags.limit : 50 })}`);
         if (this.cli.out.json) return this.cli.out.data(page.licenses);
         this.cli.out.table(page.licenses, [
-            { label: "Key", get: row => flags.reveal === true ? row.key : this.cli.out.mask(row.key) },
-            { label: "Product", get: row => row.product_name },
+            { label: "Key", get: row => this.cli.out.key(row.key, flags.reveal === true) },
+            { label: "Product", get: row => this.cli.out.bold(row.product_name) },
             { label: "Customer", get: row => row.customer_name },
             { label: "Status", get: row => this.cli.out.tone(row.status) },
             { label: "Seats", get: row => row.seats.join(", ") },
-            { label: "Expires", get: row => row.expires_at ? new Date(row.expires_at).toLocaleDateString() : "never" },
-            { label: "Last check", get: row => row.last_validated_at ? this.cli.out.date(row.last_validated_at) : "never" }
+            { label: "Expires", get: row => row.expires_at ? this.cli.out.day(row.expires_at) : this.cli.out.dim("never") },
+            { label: "Last check", get: row => this.cli.out.ago(row.last_validated_at) }
         ]);
-        if (page.total > page.licenses.length) this.cli.out.print(this.cli.out.dim(`Showing ${page.licenses.length} of ${page.total}. Use --limit or -s to narrow it.`));
+        this.cli.out.count(page.licenses.length, page.total, "licenses");
     }
 
     async product(reference) {
@@ -83,7 +85,7 @@ export class LicenseCommands {
         if (!reference) {
             const recent = (await client.call("GET", "/licenses?limit=15")).licenses;
             if (recent.length === 0) throw new KoraError("There are no licenses yet.", 0);
-            const picked = await this.cli.need(null, `${recent.map((row, index) => `  ${String(index + 1).padStart(2)}. ${this.cli.out.mask(row.key)}  ${row.product_name}  ${row.customer_name}`).join("\n")}\nLicense number: `);
+            const picked = await this.cli.need(null, `${recent.map((row, index) => `  ${this.cli.out.dim(String(index + 1).padStart(2))}  ${this.cli.out.mask(row.key)}  ${row.product_name}  ${this.cli.out.dim(row.customer_name)}`).join("\n")}\nLicense number: `);
             if (!recent[Number(picked) - 1]) throw new KoraError("Pick one of the listed numbers.", 0);
             return recent[Number(picked) - 1];
         }
@@ -109,22 +111,21 @@ export class LicenseCommands {
             client.call("GET", `/validations?license_id=${license.id}&limit=5`).then(page => page.rows ? page.rows : page.validations).catch(() => [])
         ]);
         if (this.cli.out.json) return this.cli.out.data({ ...license, seats_detail: seats, recent_checks: checks });
+        this.cli.out.print();
+        this.cli.out.print(`  ${this.cli.out.bold(license.key)}   ${this.cli.out.tone(license.status)}`);
+        this.cli.out.print();
         this.cli.out.pairs([
-            ["Key", this.cli.out.bold(license.key)],
-            ["Status", this.cli.out.tone(license.status)],
             ["Product", license.product_name],
             ["Customer", license.customer ? `${license.customer.name}${license.customer.email ? ` <${license.customer.email}>` : ""}` : null],
             ["Addons", license.addon_names.join(", ")],
-            ["Expires", license.expires_at ? this.cli.out.date(license.expires_at) : "never"],
+            ["Expires", license.expires_at ? this.cli.out.date(license.expires_at) : this.cli.out.dim("never")],
             ["Issued", this.cli.out.date(license.created_at)],
-            ["Last check", this.cli.out.date(license.last_validated_at)]
+            ["Last check", this.cli.out.ago(license.last_validated_at)]
         ]);
-        this.cli.out.print();
-        this.cli.out.print(this.cli.out.bold("Seats"));
-        this.cli.out.table(seats, [{ label: "Group", get: row => row.group_name }, { label: "Value", get: row => row.value }, { label: "Added", get: row => this.cli.out.date(row.created_at) }]);
-        this.cli.out.print();
-        this.cli.out.print(this.cli.out.bold("Recent checks"));
-        this.cli.out.table(Array.isArray(checks) ? checks : [], [{ label: "Time", get: row => this.cli.out.date(row.created_at) }, { label: "Result", get: row => this.cli.out.tone(row.code) }, { label: "IP", get: row => row.ip }, { label: "Country", get: row => row.country }, { label: "Device", get: row => row.hwid }]);
+        this.cli.out.heading("Seats");
+        this.cli.out.table(seats, [{ label: "Group", get: row => row.group_name }, { label: "Value", get: row => row.value }, { label: "Added", get: row => this.cli.out.ago(row.created_at) }], false);
+        this.cli.out.heading("Recent checks");
+        this.cli.out.table(Array.isArray(checks) ? checks : [], [{ label: "Time", get: row => this.cli.out.ago(row.created_at) }, { label: "Result", get: row => this.cli.out.result(row.code) }, { label: "IP", get: row => row.ip }, { label: "Country", get: row => row.country }, { label: "Device", get: row => row.hwid }], false);
     }
 
     async customer(flags) {

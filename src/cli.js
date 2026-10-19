@@ -14,7 +14,7 @@ import { Mcp } from "./mcp.js";
 
 export class Cli {
     constructor() {
-        this.version = "1.0.0";
+        this.version = "1.1.0";
         this.accounts = new Accounts();
         this.commands = [new AccountCommands(this), new LicenseCommands(this), new ProductCommands(this), new CustomerCommands(this), new RuleCommands(this), new StoreCommands(this), new CheckCommands(this)];
     }
@@ -45,6 +45,7 @@ export class Cli {
         this.interactive = process.stdin.isTTY === true && process.stdout.isTTY === true && flags.json !== true;
         const [name, ...rest] = positionals;
         try {
+            if (!name && flags.version !== undefined) return this.print(this.version);
             if (!name) return this.help();
             if (name === "help") return this.help(rest[0]);
             if (name === "mcp") return await new Mcp(this).start();
@@ -68,21 +69,23 @@ export class Cli {
 
     help(topic) {
         const command = topic ? this.commands.find(entry => entry.names().includes(topic)) : null;
-        if (command) return this.print(command.help());
+        if (command) return this.print(`\n${this.out.usage(command.help())}\n`);
         return this.print([
-            `${this.out.bold("kora")} ${this.version}, the Kora license manager in your terminal`,
             "",
-            this.commands.map(entry => entry.help()).join("\n\n"),
+            `${this.out.title("kora")} ${this.out.dim(`v${this.version}`)}  ${this.out.dim("The Kora license manager in your terminal")}`,
             "",
-            `${this.out.bold("AI assistants")}`,
-            "  kora mcp                                  Run as an MCP server over stdio",
+            `${this.out.bold("Usage")}  ${this.out.syntax("kora COMMAND [--flags]")}`,
             "",
-            `${this.out.bold("Everywhere")}`,
-            "  --json                                    Machine-readable output, keys unmasked",
-            "  --yes, -y                                 Never ask for confirmation",
-            "  --account NAME                            Run as another saved account",
+            this.out.overview([...this.commands.map(entry => entry.help()), {
+                title: "AI assistants",
+                rows: [["kora mcp", "Run as an MCP server over stdio"]]
+            }, {
+                title: "Everywhere",
+                rows: [["--json", "Machine-readable output, keys unmasked"], ["--yes, -y", "Never ask for confirmation"], ["--account NAME", "Run as another saved account"], ["--help, -h", "Help for one command"]]
+            }]),
             "",
-            `${this.out.dim("Environment: KORA_URL and KORA_TOKEN skip saved accounts, KORA_CONFIG moves the config file, KORA_PUBLIC_KEY is used by verify-offline, NO_COLOR turns colors off.")}`
+            this.out.dim(`Run ${this.out.cyan("kora help COMMAND")}${this.out.dim(" for its flags. KORA_URL and KORA_TOKEN skip saved accounts, NO_COLOR turns colors off.")}`),
+            ""
         ].join("\n"));
     }
 
@@ -95,16 +98,20 @@ export class Cli {
 
     ask(question, secret = false) {
         if (!this.interactive) return Promise.reject(new KoraError(`Missing input: ${question.replace(/:\s*$/, "")}. Pass it as a flag.`, 0));
+        const lines = question.split("\n");
+        const label = lines[lines.length - 1].trim().replace(/:$/, "");
+        const ending = label.endsWith("[y/N]") ? ` ${this.out.dim("(y/N)")} ` : `${this.out.dim(":")} `;
+        const prompt = [...lines.slice(0, -1), `${this.out.accent("?")} ${this.out.bold(label.replace(/ \[y\/N\]$/, ""))}${ending}`].join("\n");
         return new Promise((resolve, reject) => {
             const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
             const write = rl["_writeToOutput"];
-            if (secret) rl["_writeToOutput"] = text => write.call(rl, text.includes(question) ? text : "");
+            if (secret) rl["_writeToOutput"] = text => write.call(rl, text.includes(prompt) ? text : "");
             rl.on("SIGINT", () => {
                 rl.close();
                 process.stdout.write("\n");
                 reject(Object.assign(new Error("Cancelled"), { code: "cancelled" }));
             });
-            rl.question(question, answer => {
+            rl.question(prompt, answer => {
                 rl.close();
                 if (secret) process.stdout.write("\n");
                 resolve(answer.trim());
