@@ -1,6 +1,6 @@
 {
     "name": "@zerodev-ca/kora-cli",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "Command line for Kora licensing: manage licenses from your terminal, script it, and hand it to an AI assistant",
     "type": "module",
     "bin": {

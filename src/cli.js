@@ -6,6 +6,7 @@ import { Output } from "./output.js";
 import { AccountCommands } from "./commands/account.js";
 import { LicenseCommands } from "./commands/licenses.js";
 import { ProductCommands } from "./commands/products.js";
+import { PolicyCommands } from "./commands/policies.js";
 import { CustomerCommands } from "./commands/customers.js";
 import { RuleCommands } from "./commands/rules.js";
 import { StoreCommands } from "./commands/stores.js";
@@ -14,13 +15,13 @@ import { Mcp } from "./mcp.js";
 
 export class Cli {
     constructor() {
-        this.version = "1.1.0";
+        this.version = "1.2.0";
         this.accounts = new Accounts();
-        this.commands = [new AccountCommands(this), new LicenseCommands(this), new ProductCommands(this), new CustomerCommands(this), new RuleCommands(this), new StoreCommands(this), new CheckCommands(this)];
+        this.commands = [new AccountCommands(this), new LicenseCommands(this), new ProductCommands(this), new PolicyCommands(this), new CustomerCommands(this), new RuleCommands(this), new StoreCommands(this), new CheckCommands(this)];
     }
 
     parse(argv) {
-        const strings = ["url", "token", "name", "account", "status", "product", "customer", "email", "search", "limit", "key", "expires", "output", "file", "public-key", "fingerprint", "hwid", "version", "price", "currency", "duration", "unit", "description", "type", "value", "mode", "note", "store"];
+        const strings = ["url", "token", "name", "account", "status", "product", "customer", "email", "search", "limit", "key", "expires", "output", "file", "public-key", "fingerprint", "hwid", "version", "price", "currency", "duration", "unit", "description", "policy", "machines", "type", "value", "mode", "note", "store"];
         const booleans = ["json", "yes", "help", "reveal", "token-stdin", "all", "force"];
         const { values, positionals } = parseArgs({
             args: argv,

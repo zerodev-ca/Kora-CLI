@@ -8,10 +8,12 @@ export class Mcp {
         this.tools = [
             { name: "list_licenses", description: "List licenses, newest first. Filter by status, product id or search text (key, customer).", inputSchema: { type: "object", properties: { status: { type: "string" }, product_id: { type: "integer" }, search: { type: "string" }, limit: { type: "integer", default: 25 } } } },
             { name: "get_license", description: "Get one license by id or full key, with product, customer, seats and expiry.", inputSchema: { type: "object", properties: { license: { type: "string" } }, required: ["license"] } },
-            { name: "issue_license", description: "Issue a license for a product to a customer email. Creates the customer when the email is new.", inputSchema: { type: "object", properties: { product: { type: "string", description: "Product id or exact name" }, email: { type: "string" }, name: { type: "string" }, expires_at: { type: "string", description: "ISO date, empty for the product default" } }, required: ["product", "email"] } },
+            { name: "issue_license", description: "Issue a license for a product to a customer email. Creates the customer when the email is new. A policy fills in its expiry, max machines and addons.", inputSchema: { type: "object", properties: { product: { type: "string", description: "Product id or exact name" }, email: { type: "string" }, name: { type: "string" }, policy: { type: "string", description: "Policy id or exact name of the same product" }, expires_at: { type: "string", description: "ISO date, empty for the product default" } }, required: ["product", "email"] } },
             { name: "set_license_status", description: "Change a license status, for example active, suspended or revoked.", inputSchema: { type: "object", properties: { license: { type: "string" }, status: { type: "string" } }, required: ["license", "status"] } },
             { name: "list_products", description: "List products.", inputSchema: { type: "object", properties: { search: { type: "string" } } } },
             { name: "create_product", description: "Create a product. duration 0 means lifetime licenses.", inputSchema: { type: "object", properties: { name: { type: "string" }, version: { type: "string" }, duration: { type: "integer" }, duration_unit: { type: "string", enum: ["days", "weeks", "months", "years"] } }, required: ["name"] } },
+            { name: "list_policies", description: "List policies, the named variants of a product such as Pro, with their type, max machines, duration and license count.", inputSchema: { type: "object", properties: { product_id: { type: "integer" }, search: { type: "string" } } } },
+            { name: "create_policy", description: "Create a policy for a product. max_machines 0 keeps each whitelist group's own limit, duration 0 means lifetime.", inputSchema: { type: "object", properties: { product: { type: "string", description: "Product id or exact name" }, name: { type: "string" }, type: { type: "string", enum: ["subscription", "perpetual"] }, max_machines: { type: "integer" }, duration: { type: "integer" }, duration_unit: { type: "string", enum: ["days", "weeks", "months", "years"] } }, required: ["product", "name"] } },
             { name: "list_customers", description: "Search customers by name, email or Discord id.", inputSchema: { type: "object", properties: { search: { type: "string" } } } },
             { name: "block_customer", description: "Block or unblock a customer. Blocked customers fail validation on every license.", inputSchema: { type: "object", properties: { customer: { type: "string", description: "Id, email or Discord id" }, blocked: { type: "boolean" } }, required: ["customer", "blocked"] } },
             { name: "list_access_rules", description: "List IP, device and country block or exclude rules.", inputSchema: { type: "object", properties: {} } },
@@ -45,7 +47,7 @@ export class Mcp {
     async answer(method, params) {
         switch (method) {
             case "initialize":
-                return { protocolVersion: params.protocolVersion ? params.protocolVersion : "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "kora", version: this.cli.version }, instructions: "Kora is a license manager. Use these tools to manage licenses, products, customers and access rules on the signed-in Kora server, and sdk_snippet to add a license check to code. Confirm with the user before revoking or suspending licenses or blocking customers." };
+                return { protocolVersion: params.protocolVersion ? params.protocolVersion : "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "kora", version: this.cli.version }, instructions: "Kora is a license manager. Use these tools to manage licenses, products, policies, customers and access rules on the signed-in Kora server, and sdk_snippet to add a license check to code. Confirm with the user before revoking or suspending licenses or blocking customers." };
             case "ping":
                 return {};
             case "tools/list":
@@ -78,7 +80,7 @@ export class Mcp {
         const client = this.cli.client();
         switch (name) {
             case "list_licenses":
-                return (await client.call("GET", `/licenses${client.query({ status: input.status, product_id: input.product_id, search: input.search, limit: input.limit ? input.limit : 25 })}`)).licenses.map(row => ({ id: row.id, key: row.key, status: row.status, product: row.product_name, customer: row.customer_name, expires_at: row.expires_at, seats: row.seats }));
+                return (await client.call("GET", `/licenses${client.query({ status: input.status, product_id: input.product_id, search: input.search, limit: input.limit ? input.limit : 25 })}`)).licenses.map(row => ({ id: row.id, key: row.key, status: row.status, product: row.product_name, policy: row.policy_name, customer: row.customer_name, expires_at: row.expires_at, seats: row.seats }));
             case "get_license":
                 return client.call("GET", `/licenses/${encodeURIComponent(input.license)}`);
             case "issue_license": {
@@ -86,7 +88,7 @@ export class Mcp {
                 const email = String(input.email).toLowerCase();
                 const existing = (await client.call("GET", `/customers${client.query({ search: email, limit: 5 })}`)).customers.find(row => row.email === email);
                 const customer = existing ? existing : (await client.call("POST", "/customers", { name: input.name ? input.name : "", email })).customer;
-                return (await client.call("POST", "/licenses", { product_id: product.id, customer_id: customer.id, ...(input.expires_at ? { expires_at: input.expires_at } : {}) })).license;
+                return (await client.call("POST", "/licenses", { product_id: product.id, customer_id: customer.id, ...(input.policy ? { policy: input.policy } : {}), ...(input.expires_at ? { expires_at: input.expires_at } : {}) })).license;
             }
             case "set_license_status": {
                 const license = await client.call("GET", `/licenses/${encodeURIComponent(input.license)}`);
@@ -96,6 +98,12 @@ export class Mcp {
                 return (await client.call("GET", `/products${client.query({ search: input.search, limit: 100 })}`)).products;
             case "create_product":
                 return (await client.call("POST", "/products", input)).product;
+            case "list_policies":
+                return (await client.call("GET", `/policies${client.query({ product_id: input.product_id, search: input.search, limit: 100 })}`)).policies;
+            case "create_policy": {
+                const product = await this.product(client, input.product);
+                return (await client.call("POST", "/policies", { ...input, product_id: product.id })).policy;
+            }
             case "list_customers":
                 return (await client.call("GET", `/customers${client.query({ search: input.search, limit: 50 })}`)).customers;
             case "block_customer": {

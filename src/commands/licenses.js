@@ -17,7 +17,7 @@ export class LicenseCommands {
             rows: [
                 ["kora licenses [--status S] [--product P] [-s TEXT] [--reveal]", "Newest first, keys masked"],
                 ["kora licenses show LICENSE", "Details, seats and recent checks"],
-                ["kora licenses issue --product P (--customer C | --email E) [--name N] [--key K] [--expires DATE]", "Issue a license"],
+                ["kora licenses issue --product P (--customer C | --email E) [--policy P] [--name N] [--key K] [--expires DATE]", "Issue a license, filled in from the policy"],
                 ["kora licenses suspend | revoke | reinstate LICENSE", "Change the status"],
                 ["kora licenses status LICENSE STATUS", "Any configured status"],
                 ["kora licenses download LICENSE [-o FILE]", "Signed offline file, - for stdout"],
@@ -61,6 +61,7 @@ export class LicenseCommands {
         this.cli.out.table(page.licenses, [
             { label: "Key", get: row => this.cli.out.key(row.key, flags.reveal === true) },
             { label: "Product", get: row => this.cli.out.bold(row.product_name) },
+            { label: "Policy", get: row => row.policy_name },
             { label: "Customer", get: row => row.customer_name },
             { label: "Status", get: row => this.cli.out.tone(row.status) },
             { label: "Seats", get: row => row.seats.join(", ") },
@@ -116,6 +117,7 @@ export class LicenseCommands {
         this.cli.out.print();
         this.cli.out.pairs([
             ["Product", license.product_name],
+            ["Policy", license.policy_name],
             ["Customer", license.customer ? `${license.customer.name}${license.customer.email ? ` <${license.customer.email}>` : ""}` : null],
             ["Addons", license.addon_names.join(", ")],
             ["Expires", license.expires_at ? this.cli.out.date(license.expires_at) : this.cli.out.dim("never")],
@@ -140,7 +142,7 @@ export class LicenseCommands {
     async issue(flags) {
         const client = this.cli.client();
         const product = await this.product(await this.cli.need(flags.product, "Product: "));
-        const license = (await client.call("POST", "/licenses", { product_id: product.id, customer_id: await this.customer(flags), ...(flags.key ? { key: flags.key } : {}), ...(flags.expires ? { expires_at: flags.expires } : {}), ...(flags.status ? { status: flags.status } : {}) })).license;
+        const license = (await client.call("POST", "/licenses", { product_id: product.id, customer_id: await this.customer(flags), ...(flags.policy ? { policy: flags.policy } : {}), ...(flags.key ? { key: flags.key } : {}), ...(flags.expires ? { expires_at: flags.expires } : {}), ...(flags.status ? { status: flags.status } : {}) })).license;
         if (this.cli.out.json) return this.cli.out.data(license);
         this.cli.out.done(`Issued ${this.cli.out.bold(license.key)} for ${license.product_name} to ${license.customer_name}.`);
     }

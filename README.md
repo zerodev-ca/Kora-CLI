@@ -37,10 +37,11 @@ Several servers can be saved at once. `kora accounts` lists them, `kora switch` 
 ```bash
 kora licenses --status active -s jane
 kora licenses show jane@example.com
-kora licenses issue --product "My Plugin" --email jane@example.com --name Jane
+kora licenses issue --product "My Plugin" --email jane@example.com --name Jane --policy Pro
 kora licenses suspend 7QF2 --yes
 kora licenses download 7QF2 -o jane.lic
 kora products create "My Plugin" --duration 365 --unit days
+kora policies create Pro --product "My Plugin" --machines 2 --duration 1 --unit years
 kora customers block jane@example.com
 kora customers merge 12 31
 kora rules add --type ip --value 203.0.113.0/24
@@ -84,7 +85,7 @@ kora licenses revoke "$KEY" --yes
 claude mcp add kora -- kora mcp
 ```
 
-`kora mcp` speaks the Model Context Protocol over stdio with the signed-in account. Its tools list and issue licenses, change statuses, manage products, customers and access rules, validate keys and return SDK snippets for Node.js, Python, Java, FiveM, .NET, PHP, Go and Rust. Give it a token with only the scopes it needs.
+`kora mcp` speaks the Model Context Protocol over stdio with the signed-in account. Its tools list and issue licenses, change statuses, manage products, policies, customers and access rules, validate keys and return SDK snippets for Node.js, Python, Java, FiveM, .NET, PHP, Go and Rust. Give it a token with only the scopes it needs.
 
 ## Building
 

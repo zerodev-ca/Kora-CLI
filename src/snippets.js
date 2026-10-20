@@ -10,7 +10,7 @@ export class Snippets {
             case "python":
                 return { install: "pip install zerodev-kora", code: `import os\nfrom kora import Client\n\nkora = Client("${url}", product="${product}", public_key=os.environ["KORA_PUBLIC_KEY"])\n\nresult = kora.activate(license_key, hwid=machine_id)\nif not result.valid:\n    raise SystemExit(result.message)` };
             case "java":
-                return { install: "implementation(\"ca.zerodev:kora-java:3.1.1\")", code: `KoraClient kora = new KoraClient.Builder()\n    .url("${url}")\n    .product("${product}")\n    .publicKey(System.getenv("KORA_PUBLIC_KEY"))\n    .build();\n\nKoraResponse result = kora.activate(licenseKey, Map.of("hwid", machineId));\nif (!result.isValid()) {\n    throw new IllegalStateException(result.getMessage());\n}` };
+                return { install: "implementation(\"ca.zerodev:kora-java:3.2.0\")", code: `KoraClient kora = new KoraClient.Builder()\n    .url("${url}")\n    .product("${product}")\n    .publicKey(System.getenv("KORA_PUBLIC_KEY"))\n    .build();\n\nKoraResponse result = kora.activate(licenseKey, Map.of("hwid", machineId));\nif (!result.isValid()) {\n    throw new IllegalStateException(result.getMessage());\n}` };
             case "fivem":
                 return { install: "ensure kora-fivem", code: `local config = { url = "${url}", product = "${product}", fields = { hwid = GetConvar("sv_hostname", "") } }\n\nexports["kora-fivem"]:activate(config, GetConvar("license_key", ""), function(valid, data)\n    if not valid then\n        print("^1" .. data.message .. "^7")\n        StopResource(GetCurrentResourceName())\n    end\nend)` };
             case "dotnet":
